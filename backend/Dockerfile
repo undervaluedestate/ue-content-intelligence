@@ -25,5 +25,5 @@ RUN chmod +x railway_start.sh
 # Expose port (Railway will set PORT env var)
 EXPOSE 8080
 
-# Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Run the application using shell to expand $PORT variable
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}
