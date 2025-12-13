@@ -75,6 +75,16 @@ async def root():
     }
 
 
+@app.get("/health")
+async def health():
+    """Health check endpoint for Railway and other monitoring services."""
+    return {
+        "status": "healthy",
+        "environment": settings.APP_ENV,
+        "database": "connected"
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
