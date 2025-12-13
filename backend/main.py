@@ -76,12 +76,13 @@ async def root():
 
 
 @app.get("/health")
-async def health():
+async def health_check():
     """Health check endpoint for Railway and other monitoring services."""
     return {
         "status": "healthy",
         "environment": settings.APP_ENV,
-        "database": "connected"
+        "database": "connected",
+        "version": "1.0.0"
     }
 
 
