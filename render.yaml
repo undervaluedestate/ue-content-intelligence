@@ -1,0 +1,52 @@
+services:
+  # Backend API
+  - type: web
+    name: content-intelligence-api
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:///./content_intelligence.db
+      - key: APP_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: API_V1_PREFIX
+        value: /api/v1
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: DEFAULT_AI_MODEL
+        value: gemini-pro
+      - key: CONTENT_TEMPERATURE
+        value: "0.7"
+      - key: MAX_TRENDS_PER_CYCLE
+        value: "20"
+      - key: RELEVANCE_THRESHOLD
+        value: "60"
+      - key: INGESTION_INTERVAL_HOURS
+        value: "2"
+      - key: DIGEST_TIME
+        value: "08:00"
+      - key: DIGEST_TIMEZONE
+        value: Africa/Lagos
+      - key: ENABLE_TWITTER_INGESTION
+        value: "false"
+      - key: ENABLE_GOOGLE_NEWS
+        value: "true"
+      - key: ENABLE_EMAIL_DIGEST
+        value: "false"
+      - key: ENABLE_NATIVE_SCHEDULING
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: USE_GMAIL_API
+        value: "false"
+      - key: ADMIN_EMAIL
+        value: admin@example.com
+      - key: DIGEST_RECIPIENTS
+        value: team@example.com
