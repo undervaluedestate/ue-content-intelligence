@@ -9,6 +9,7 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
+    runtimeVersion: "3.9"
     envVars:
       - key: DATABASE_URL
         value: sqlite:///./content_intelligence.db
