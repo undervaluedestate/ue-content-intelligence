@@ -115,16 +115,16 @@ class RelevanceScoringService:
         if not matched_keywords:
             return 0.0, []
         
-        # Base score from keyword count
-        base_score = min(len(matched_keywords) * 15, 70)
+        # Base score from keyword count (more generous)
+        base_score = min(len(matched_keywords) * 10, 60)
         
-        # Bonus for high-priority keywords
+        # Bonus for high-priority real estate keywords
         priority_keywords = [
-            'real estate', 'housing', 'rent', 'property', 'land',
-            'inflation', 'naira', 'economy', 'investment'
+            'real estate', 'housing', 'property', 'land', 'mortgage', 'rent',
+            'developer', 'construction', 'residential', 'commercial', 'apartment'
         ]
         priority_matches = [kw for kw in matched_keywords if kw in priority_keywords]
-        priority_bonus = len(priority_matches) * 10
+        priority_bonus = len(priority_matches) * 15
         
         # Bonus for multiple keyword categories
         categories = {

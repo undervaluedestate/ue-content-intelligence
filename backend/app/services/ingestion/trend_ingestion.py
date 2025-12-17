@@ -169,17 +169,20 @@ class TrendIngestionService:
         Returns count of new trends ingested.
         """
         try:
-            # Google News RSS feeds - Fetch top Nigeria news, let AI scoring filter relevance
+            # Google News RSS feeds - Mix of broad and targeted real estate searches
             rss_feeds = [
-                # Top Nigeria news (last 12 hours)
-                "https://news.google.com/rss/search?q=Nigeria+when:12h&hl=en-NG&gl=NG&ceid=NG:en",
-                # Business & Economy
+                # Real Estate Specific (targeted)
+                "https://news.google.com/rss/search?q=Nigeria+real+estate+when:12h&hl=en-NG&gl=NG&ceid=NG:en",
+                "https://news.google.com/rss/search?q=Nigeria+property+housing+when:12h&hl=en-NG&gl=NG&ceid=NG:en",
+                "https://news.google.com/rss/search?q=Lagos+real+estate+development+when:12h&hl=en-NG&gl=NG&ceid=NG:en",
+                # Economic Impact (relevant to real estate)
+                "https://news.google.com/rss/search?q=Nigeria+inflation+interest+rate+when:12h&hl=en-NG&gl=NG&ceid=NG:en",
+                "https://news.google.com/rss/search?q=Nigeria+infrastructure+development+when:12h&hl=en-NG&gl=NG&ceid=NG:en",
+                # General Business & Economy (broad net)
                 "https://news.google.com/rss/search?q=Nigeria+business+when:12h&hl=en-NG&gl=NG&ceid=NG:en",
                 "https://news.google.com/rss/search?q=Nigeria+economy+when:12h&hl=en-NG&gl=NG&ceid=NG:en",
-                # Lagos (major market)
-                "https://news.google.com/rss/search?q=Lagos+when:12h&hl=en-NG&gl=NG&ceid=NG:en",
-                # Top headlines
-                "https://news.google.com/rss/topics/CAAqJQgKIh9DQkFTRVFvSUwyMHZNRFZ4ZERBU0JXVnVMVWRDS0FBUAE?hl=en-NG&gl=NG&ceid=NG:en",
+                # Top Nigeria news (catch-all)
+                "https://news.google.com/rss/search?q=Nigeria+when:12h&hl=en-NG&gl=NG&ceid=NG:en",
             ]
             
             new_count = 0

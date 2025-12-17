@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     
     # Content Settings
     MAX_TRENDS_PER_CYCLE: int = 20
-    RELEVANCE_THRESHOLD: int = 60
+    RELEVANCE_THRESHOLD: int = 40  # Lowered from 60 to capture more relevant content
     
     # Scheduling
     INGESTION_INTERVAL_HOURS: int = 2
@@ -89,12 +89,27 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = "INFO"
     
-    # Nigerian Context - Pre-configured Keywords
+    # Nigerian Context - Pre-configured Keywords (Expanded for better matching)
     NIGERIAN_KEYWORDS: List[str] = [
-        "real estate", "land", "rent", "housing", "mortgage", "property",
-        "power", "gas", "inflation", "naira", "policy", "investment",
-        "lagos", "abuja", "nigeria", "cbn", "economy", "subsidy",
-        "fuel", "electricity", "nepa", "landlord", "tenant"
+        # Real Estate Core
+        "real estate", "property", "land", "housing", "mortgage", "rent", "rental",
+        "landlord", "tenant", "lease", "apartment", "house", "building", "construction",
+        "developer", "estate", "residential", "commercial", "office space",
+        # Economic Factors
+        "inflation", "naira", "exchange rate", "interest rate", "cbn", "central bank",
+        "economy", "economic", "gdp", "growth", "recession", "investment", "investor",
+        "finance", "loan", "credit", "bank", "banking",
+        # Infrastructure & Utilities
+        "infrastructure", "development", "project", "power", "electricity", "nepa",
+        "water", "road", "transport", "gas", "fuel", "subsidy",
+        # Policy & Regulation
+        "policy", "government", "regulation", "law", "tax", "budget", "minister",
+        "federal", "state", "local government",
+        # Locations
+        "lagos", "abuja", "port harcourt", "kano", "ibadan", "lekki", "ikoyi",
+        "victoria island", "banana island", "ajah", "ikeja",
+        # General Business
+        "business", "market", "sector", "industry", "company", "startup", "entrepreneur"
     ]
     
     # Risk Keywords - Topics to flag as sensitive
