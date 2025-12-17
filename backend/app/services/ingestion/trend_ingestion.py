@@ -241,11 +241,18 @@ class TrendIngestionService:
                                 new_count += 1
                             except Exception as entry_error:
                                 logger.error(f"Error processing entry: {entry_error}")
+                        
+                        # Commit after each feed to avoid losing all data on duplicate error
+                        try:
+                            self.db.commit()
+                            logger.info(f"Committed {new_count} trends so far")
+                        except Exception as commit_error:
+                            logger.error(f"Error committing trends: {commit_error}")
+                            self.db.rollback()
                     
                     except Exception as e:
-                        logger.error(f"Error parsing feed {feed_url}: {e}")
+                        logger.error(f"Error parsing feed: {e}")
             
-            self.db.commit()
             logger.info(f"Ingested {new_count} news items from Google News")
             return new_count
         
