@@ -169,16 +169,26 @@ class TrendIngestionService:
         Returns count of new trends ingested.
         """
         try:
-            # Google News RSS feeds for Nigerian topics
+            # Google News RSS feeds - Focus on fresh business developments relevant to real estate
             rss_feeds = [
-                "https://news.google.com/rss/search?q=Nigeria+real+estate&hl=en-NG&gl=NG&ceid=NG:en",
-                "https://news.google.com/rss/search?q=Nigeria+housing&hl=en-NG&gl=NG&ceid=NG:en",
-                "https://news.google.com/rss/search?q=Nigeria+inflation&hl=en-NG&gl=NG&ceid=NG:en",
-                "https://news.google.com/rss/search?q=Nigeria+investment&hl=en-NG&gl=NG&ceid=NG:en",
+                # Real estate specific
+                "https://news.google.com/rss/search?q=Nigeria+real+estate+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
+                "https://news.google.com/rss/search?q=Nigeria+property+market+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
+                "https://news.google.com/rss/search?q=Nigeria+housing+development+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
+                "https://news.google.com/rss/search?q=Nigeria+land+investment+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
+                # Economic factors affecting real estate
+                "https://news.google.com/rss/search?q=Nigeria+inflation+rate+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
+                "https://news.google.com/rss/search?q=Nigeria+interest+rates+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
+                "https://news.google.com/rss/search?q=Nigeria+naira+exchange+rate+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
+                # Policy and infrastructure
+                "https://news.google.com/rss/search?q=Nigeria+infrastructure+development+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
+                "https://news.google.com/rss/search?q=Nigeria+government+policy+housing+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
+                "https://news.google.com/rss/search?q=Lagos+development+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
             ]
             
             new_count = 0
-            cutoff_time = datetime.utcnow() - timedelta(hours=settings.INGESTION_INTERVAL_HOURS * 2)
+            # Only accept articles from the last 24 hours
+            cutoff_time = datetime.utcnow() - timedelta(hours=24)
             
             logger.info(f"Starting Google News ingestion from {len(rss_feeds)} feeds")
             
@@ -198,9 +208,16 @@ class TrendIngestionService:
                         
                         for entry in feed.entries[:10]:  # Limit to 10 per feed
                             try:
-                                # Parse published date
-                                published = datetime(*entry.published_parsed[:6]) if hasattr(entry, 'published_parsed') else datetime.utcnow()
+                                # Parse published date (handle future dates from Google News)
+                                try:
+                                    published = datetime(*entry.published_parsed[:6]) if hasattr(entry, 'published_parsed') else datetime.utcnow()
+                                    # If date is in the future, use current time
+                                    if published > datetime.utcnow():
+                                        published = datetime.utcnow()
+                                except:
+                                    published = datetime.utcnow()
                                 
+                                # Skip articles older than 24 hours
                                 if published < cutoff_time:
                                     continue
                                 
