@@ -169,10 +169,8 @@ class TrendIngestionService:
         Returns count of new trends ingested.
         """
         try:
-            # Nigerian news sources and topics
+            # Google News RSS feeds for Nigerian topics
             rss_feeds = [
-                # General Nigerian news
-                "https://news.google.com/rss/search?q=Nigeria+economy&hl=en-NG&gl=NG&ceid=NG:en",
                 "https://news.google.com/rss/search?q=Nigeria+real+estate&hl=en-NG&gl=NG&ceid=NG:en",
                 "https://news.google.com/rss/search?q=Nigeria+housing&hl=en-NG&gl=NG&ceid=NG:en",
                 "https://news.google.com/rss/search?q=Nigeria+inflation&hl=en-NG&gl=NG&ceid=NG:en",
@@ -182,11 +180,23 @@ class TrendIngestionService:
             new_count = 0
             cutoff_time = datetime.utcnow() - timedelta(hours=settings.INGESTION_INTERVAL_HOURS * 2)
             
-            async with httpx.AsyncClient() as client:
+            logger.info(f"Starting Google News ingestion from {len(rss_feeds)} feeds")
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 for feed_url in rss_feeds:
                     try:
-                        response = await client.get(feed_url, timeout=10.0)
+                        logger.debug(f"Fetching feed: {feed_url}")
+                        response = await client.get(feed_url, follow_redirects=True)
+                        response.raise_for_status()
+                        
+                        logger.debug(f"Parsing feed response ({len(response.text)} bytes)")
                         feed = feedparser.parse(response.text)
+                        
+                        if not feed.entries:
+                            logger.warning(f"No entries found in feed: {feed_url}")
+                            continue
+                        
+                        logger.info(f"Found {len(feed.entries)} entries in feed")
                         
                         for entry in feed.entries[:10]:  # Limit to 10 per feed
                             # Parse published date

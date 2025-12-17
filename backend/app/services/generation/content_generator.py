@@ -40,8 +40,8 @@ class ContentGenerationService:
         Generate content for top scored trends that don't have drafts yet.
         Returns count of content pieces generated.
         """
-        if not self.client:
-            logger.error("OpenAI client not initialized. Check API key.")
+        if not self.model:
+            logger.error("AI model not initialized. Check API key configuration.")
             return 0
         
         # Get top trends without content drafts
