@@ -185,48 +185,49 @@ class TrendIngestionService:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 for feed_url in rss_feeds:
                     try:
-                        logger.debug(f"Fetching feed: {feed_url}")
                         response = await client.get(feed_url, follow_redirects=True)
                         response.raise_for_status()
                         
-                        logger.debug(f"Parsing feed response ({len(response.text)} bytes)")
                         feed = feedparser.parse(response.text)
                         
                         if not feed.entries:
-                            logger.warning(f"No entries found in feed: {feed_url}")
+                            logger.warning(f"No entries in feed")
                             continue
                         
-                        logger.info(f"Found {len(feed.entries)} entries in feed")
+                        logger.info(f"Processing {len(feed.entries)} entries from feed")
                         
                         for entry in feed.entries[:10]:  # Limit to 10 per feed
-                            # Parse published date
-                            published = datetime(*entry.published_parsed[:6]) if hasattr(entry, 'published_parsed') else datetime.utcnow()
-                            
-                            if published < cutoff_time:
-                                continue
-                            
-                            # Check if already exists
-                            source_id = f"google_news_{entry.get('id', entry.link)}"
-                            existing = self.db.query(Trend).filter(
-                                Trend.source_id == source_id
-                            ).first()
-                            
-                            if existing:
-                                continue
-                            
-                            # Create new trend
-                            trend = Trend(
-                                source="google_news",
-                                source_id=source_id,
-                                title=entry.title,
-                                text=entry.get('summary', entry.title),
-                                url=entry.link,
-                                author=entry.get('source', {}).get('title', 'Unknown'),
-                                timestamp=published
-                            )
-                            
-                            self.db.add(trend)
-                            new_count += 1
+                            try:
+                                # Parse published date
+                                published = datetime(*entry.published_parsed[:6]) if hasattr(entry, 'published_parsed') else datetime.utcnow()
+                                
+                                if published < cutoff_time:
+                                    continue
+                                
+                                # Check if already exists
+                                source_id = f"google_news_{entry.get('id', entry.link)}"
+                                existing = self.db.query(Trend).filter(
+                                    Trend.source_id == source_id
+                                ).first()
+                                
+                                if existing:
+                                    continue
+                                
+                                # Create new trend
+                                trend = Trend(
+                                    source="google_news",
+                                    source_id=source_id,
+                                    title=entry.title,
+                                    text=entry.get('summary', entry.title),
+                                    url=entry.link,
+                                    author=entry.get('source', {}).get('title', 'Unknown'),
+                                    timestamp=published
+                                )
+                                
+                                self.db.add(trend)
+                                new_count += 1
+                            except Exception as entry_error:
+                                logger.error(f"Error processing entry: {entry_error}")
                     
                     except Exception as e:
                         logger.error(f"Error parsing feed {feed_url}: {e}")
