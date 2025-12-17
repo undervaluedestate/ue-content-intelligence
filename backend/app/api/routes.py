@@ -454,6 +454,34 @@ async def send_digest(db: Session = Depends(get_db)):
     return result
 
 
+@router.get("/trends/all")
+async def get_all_trends(
+    limit: int = Query(20, le=100),
+    db: Session = Depends(get_db)
+):
+    """Get all trends with scores (including those that didn't pass filter) for debugging."""
+    trends = db.query(Trend).outerjoin(ScoredTrend).order_by(Trend.id.desc()).limit(limit).all()
+    
+    result = []
+    for trend in trends:
+        scored = trend.scored_trend if hasattr(trend, 'scored_trend') else None
+        result.append({
+            'id': trend.id,
+            'source': trend.source,
+            'title': trend.title,
+            'text': trend.text[:200] + '...' if len(trend.text) > 200 else trend.text,
+            'url': trend.url,
+            'timestamp': trend.timestamp,
+            'processed': trend.processed,
+            'relevance_score': scored.relevance_score if scored else None,
+            'passed_filter': scored.passed_filter if scored else None,
+            'risk_level': scored.risk_level.value if scored else None,
+            'keyword_matches': scored.keyword_matches if scored else None
+        })
+    
+    return result
+
+
 @router.get("/health")
 async def health_check():
     """Health check endpoint."""
