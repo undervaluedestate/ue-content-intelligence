@@ -47,6 +47,14 @@ class Settings(BaseSettings):
     GMAIL_CREDENTIALS_PATH: str = "credentials.json"  # Path to OAuth2 credentials
     GMAIL_TOKEN_PATH: str = "token.pickle"  # Path to store OAuth2 token
     
+    # Gmail OAuth2 credentials (alternative to file-based auth)
+    GMAIL_API_CLIENT_ID: Optional[str] = None
+    GMAIL_API_CLIENT_SECRET: Optional[str] = None
+    GMAIL_API_REDIRECT_URI: Optional[str] = None
+    GMAIL_API_REFRESH_TOKEN: Optional[str] = None
+    GMAIL_USER: Optional[str] = None
+    GMAIL_PASS: Optional[str] = None  # App password (simpler alternative to OAuth2)
+    
     # Email - Resend (legacy, kept for backward compatibility)
     RESEND_API_KEY: Optional[str] = None
     

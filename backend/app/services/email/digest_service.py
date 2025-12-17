@@ -11,9 +11,10 @@ from loguru import logger
 from app.core.config import settings
 from app.models.database import ContentDraft
 
-# Try to import Gmail service
+# Try to import Gmail services
 try:
     from app.services.email.gmail_service import GmailService
+    from app.services.email.gmail_smtp_service import GmailSMTPService
     GMAIL_AVAILABLE = True
 except ImportError:
     GMAIL_AVAILABLE = False
@@ -35,10 +36,17 @@ class EmailDigestService:
         self.db = db
         self.gmail_service = None
         
-        # Initialize Gmail API if enabled
+        # Initialize Gmail service if enabled
         if settings.USE_GMAIL_API and GMAIL_AVAILABLE:
-            self.gmail_service = GmailService(db)
-            logger.info("Using Gmail API for email delivery")
+            # Use SMTP service if we have OAuth credentials or app password
+            if (hasattr(settings, 'GMAIL_USER') and settings.GMAIL_USER and 
+                (settings.GMAIL_PASS or settings.GMAIL_API_REFRESH_TOKEN)):
+                self.gmail_service = GmailSMTPService(db)
+                logger.info("Using Gmail SMTP for email delivery")
+            else:
+                # Fall back to file-based Gmail API
+                self.gmail_service = GmailService(db)
+                logger.info("Using Gmail API for email delivery")
         # Fall back to Resend if Gmail not available
         elif RESEND_AVAILABLE and settings.RESEND_API_KEY:
             resend.api_key = settings.RESEND_API_KEY
