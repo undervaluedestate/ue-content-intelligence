@@ -482,6 +482,20 @@ async def get_all_trends(
     return result
 
 
+@router.get("/debug/config")
+async def debug_config():
+    """Debug endpoint to check configuration (masked sensitive values)."""
+    return {
+        "google_api_key_set": bool(settings.GOOGLE_API_KEY),
+        "google_api_key_length": len(settings.GOOGLE_API_KEY) if settings.GOOGLE_API_KEY else 0,
+        "openai_api_key_set": bool(settings.OPENAI_API_KEY),
+        "relevance_threshold": settings.RELEVANCE_THRESHOLD,
+        "keyword_count": len(settings.NIGERIAN_KEYWORDS),
+        "enable_google_news": settings.ENABLE_GOOGLE_NEWS,
+        "database_url": settings.DATABASE_URL[:20] + "..." if settings.DATABASE_URL else None
+    }
+
+
 @router.get("/health")
 async def health_check():
     """Health check endpoint."""
