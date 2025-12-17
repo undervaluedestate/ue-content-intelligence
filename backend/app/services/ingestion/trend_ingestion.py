@@ -169,26 +169,22 @@ class TrendIngestionService:
         Returns count of new trends ingested.
         """
         try:
-            # Google News RSS feeds - Focus on fresh business developments relevant to real estate
+            # Google News RSS feeds - Fetch top Nigeria news, let AI scoring filter relevance
             rss_feeds = [
-                # Real estate specific
-                "https://news.google.com/rss/search?q=Nigeria+real+estate+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
-                "https://news.google.com/rss/search?q=Nigeria+property+market+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
-                "https://news.google.com/rss/search?q=Nigeria+housing+development+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
-                "https://news.google.com/rss/search?q=Nigeria+land+investment+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
-                # Economic factors affecting real estate
-                "https://news.google.com/rss/search?q=Nigeria+inflation+rate+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
-                "https://news.google.com/rss/search?q=Nigeria+interest+rates+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
-                "https://news.google.com/rss/search?q=Nigeria+naira+exchange+rate+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
-                # Policy and infrastructure
-                "https://news.google.com/rss/search?q=Nigeria+infrastructure+development+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
-                "https://news.google.com/rss/search?q=Nigeria+government+policy+housing+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
-                "https://news.google.com/rss/search?q=Lagos+development+when:1d&hl=en-NG&gl=NG&ceid=NG:en",
+                # Top Nigeria news (last 12 hours)
+                "https://news.google.com/rss/search?q=Nigeria+when:12h&hl=en-NG&gl=NG&ceid=NG:en",
+                # Business & Economy
+                "https://news.google.com/rss/search?q=Nigeria+business+when:12h&hl=en-NG&gl=NG&ceid=NG:en",
+                "https://news.google.com/rss/search?q=Nigeria+economy+when:12h&hl=en-NG&gl=NG&ceid=NG:en",
+                # Lagos (major market)
+                "https://news.google.com/rss/search?q=Lagos+when:12h&hl=en-NG&gl=NG&ceid=NG:en",
+                # Top headlines
+                "https://news.google.com/rss/topics/CAAqJQgKIh9DQkFTRVFvSUwyMHZNRFZ4ZERBU0JXVnVMVWRDS0FBUAE?hl=en-NG&gl=NG&ceid=NG:en",
             ]
             
             new_count = 0
-            # Only accept articles from the last 24 hours
-            cutoff_time = datetime.utcnow() - timedelta(hours=24)
+            # Accept articles from the last 12 hours
+            cutoff_time = datetime.utcnow() - timedelta(hours=12)
             
             logger.info(f"Starting Google News ingestion from {len(rss_feeds)} feeds")
             
@@ -217,7 +213,7 @@ class TrendIngestionService:
                                 except:
                                     published = datetime.utcnow()
                                 
-                                # Skip articles older than 24 hours
+                                # Skip articles older than 12 hours
                                 if published < cutoff_time:
                                     continue
                                 
