@@ -17,6 +17,7 @@ from app.models.database import (
 from app.services.ingestion.trend_ingestion import TrendIngestionService
 from app.services.scoring.relevance_scorer import RelevanceScoringService
 from app.services.generation.content_generator import ContentGenerationService
+from app.services.email.digest_service import EmailDigestService
 
 router = APIRouter()
 
@@ -429,6 +430,28 @@ async def get_stats(db: Session = Depends(get_db)):
             'scheduled': scheduled_content
         }
     }
+
+
+@router.post("/digest/send")
+async def send_digest(db: Session = Depends(get_db)):
+    """Manually trigger sending of email digest with pending content."""
+    # Get pending content drafts
+    pending_drafts = db.query(ContentDraft).filter(
+        ContentDraft.status == ContentStatus.PENDING
+    ).all()
+    
+    if not pending_drafts:
+        return {
+            "status": "skipped",
+            "reason": "no_pending_content",
+            "message": "No pending content to send in digest"
+        }
+    
+    # Send digest
+    digest_service = EmailDigestService(db)
+    result = await digest_service.send_digest(pending_drafts)
+    
+    return result
 
 
 @router.get("/health")
