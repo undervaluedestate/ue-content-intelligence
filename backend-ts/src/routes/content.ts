@@ -4,7 +4,7 @@ import { ContentGeneratorService } from '../services/generation/contentGenerator
 
 const router = Router();
 
-// POST /api/v1/content/generate - Generate content for top scored trends
+// POST /api/v1/content/generate - Generate content for trends
 router.post('/generate', async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 5;
@@ -18,6 +18,76 @@ router.post('/generate', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Content generation error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// POST /api/v1/content/generate/all - Generate content for ALL trends
+router.post('/generate/all', async (req: Request, res: Response) => {
+  try {
+    const generatorService = new ContentGeneratorService();
+    
+    // Get total trend count
+    const totalTrends = await prisma.trend.count();
+    
+    // Generate content for all trends (in batches to avoid timeout)
+    const batchSize = 10;
+    let totalGenerated = 0;
+    
+    for (let offset = 0; offset < totalTrends; offset += batchSize) {
+      const count = await generatorService.generateContentForTopTrends(batchSize);
+      totalGenerated += count;
+      
+      // Small delay between batches to avoid rate limits
+      if (offset + batchSize < totalTrends) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+    
+    res.json({
+      status: 'success',
+      total_trends: totalTrends,
+      generated_count: totalGenerated,
+    });
+  } catch (error) {
+    console.error('Bulk content generation error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// POST /api/v1/content/generate/:trendId - Regenerate content for specific trend
+router.post('/generate/:trendId', async (req: Request, res: Response) => {
+  try {
+    const trendId = parseInt(req.params.trendId);
+    
+    const trend = await prisma.trend.findUnique({
+      where: { id: trendId },
+      include: { scoredTrend: true },
+    });
+    
+    if (!trend) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Trend not found',
+      });
+    }
+    
+    const generatorService = new ContentGeneratorService();
+    const count = await (generatorService as any).generateContentForTrend(trend);
+    
+    res.json({
+      status: 'success',
+      trend_id: trendId,
+      generated_count: count,
+    });
+  } catch (error) {
+    console.error('Single trend content generation error:', error);
     res.status(500).json({
       status: 'error',
       message: error instanceof Error ? error.message : 'Unknown error',

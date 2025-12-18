@@ -22,38 +22,31 @@ export class ContentGeneratorService {
       return 0;
     }
 
-    // Get top trends without content drafts
-    const scoredTrends = await prisma.scoredTrend.findMany({
-      where: {
-        passedFilter: true,
-        trend: {
-          content: {
-            none: {},
-          },
-        },
-      },
+    // Get ALL trends (no filtering by passedFilter or existing content)
+    // This allows generating multiple drafts per trend
+    const trends = await prisma.trend.findMany({
       include: {
-        trend: true,
+        scoredTrend: true,
       },
       orderBy: {
-        relevanceScore: 'desc',
+        id: 'desc', // Most recent first
       },
       take: limit,
     });
 
-    if (scoredTrends.length === 0) {
-      console.log('ℹ️  No new trends to generate content for');
+    if (trends.length === 0) {
+      console.log('ℹ️  No trends found to generate content for');
       return 0;
     }
 
     let totalGenerated = 0;
 
-    for (const scoredTrend of scoredTrends) {
+    for (const trend of trends) {
       try {
-        const count = await this.generateContentForTrend(scoredTrend);
+        const count = await this.generateContentForTrend(trend);
         totalGenerated += count;
       } catch (error) {
-        console.error(`❌ Error generating content for trend ${scoredTrend.id}:`, error);
+        console.error(`❌ Error generating content for trend ${trend.id}:`, error);
       }
     }
 
@@ -61,8 +54,10 @@ export class ContentGeneratorService {
     return totalGenerated;
   }
 
-  private async generateContentForTrend(scoredTrend: any): Promise<number> {
-    const trend = scoredTrend.trend;
+  private async generateContentForTrend(trend: any): Promise<number> {
+    const scoredTrend = trend.scoredTrend;
+    const relevanceScore = scoredTrend?.relevanceScore || 'N/A';
+    const keywords = scoredTrend?.keywordMatches?.join(', ') || 'N/A';
     
     const prompt = `You are a social media content creator for a Nigerian real estate brand called "Undervalued Estate".
 
@@ -71,8 +66,8 @@ Based on this trending news article, create engaging social media content:
 Title: ${trend.title}
 Content: ${trend.text}
 URL: ${trend.url}
-Relevance Score: ${scoredTrend.relevanceScore}
-Keywords: ${scoredTrend.keywordMatches.join(', ')}
+Relevance Score: ${relevanceScore}
+Keywords: ${keywords}
 
 Create 3 social media posts:
 1. A Twitter/X post (280 characters max)
