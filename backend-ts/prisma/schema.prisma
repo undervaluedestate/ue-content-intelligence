@@ -1,0 +1,74 @@
+// Prisma schema for Content Intelligence System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Trend {
+  id          Int      @id @default(autoincrement())
+  source      String   // "twitter", "google_news", "rss"
+  sourceId    String   @unique @map("source_id")
+  title       String?
+  text        String
+  url         String?
+  author      String?
+  timestamp   DateTime
+  ingestedAt  DateTime @default(now()) @map("ingested_at")
+  
+  // Engagement metrics
+  likes       Int      @default(0)
+  shares      Int      @default(0)
+  comments    Int      @default(0)
+  views       Int      @default(0)
+  
+  // Processing status
+  processed   Boolean  @default(false)
+  
+  // Relations
+  scoredTrend ScoredTrend?
+  content     ContentDraft[]
+  
+  @@map("trends")
+}
+
+model ScoredTrend {
+  id                Int      @id @default(autoincrement())
+  trendId           Int      @unique @map("trend_id")
+  relevanceScore    Float    @map("relevance_score")
+  viralityScore     Float    @default(0) @map("virality_score")
+  macroImpactScore  Float    @default(0) @map("macro_impact_score")
+  riskLevel         String   @map("risk_level") // "safe", "sensitive", "avoid"
+  keywordMatches    String[] @map("keyword_matches")
+  sensitiveFlags    String[] @default([]) @map("sensitive_flags")
+  riskReason        String?  @map("risk_reason")
+  passedFilter      Boolean  @map("passed_filter")
+  scoredAt          DateTime @default(now()) @map("scored_at")
+  
+  // Relations
+  trend             Trend    @relation(fields: [trendId], references: [id], onDelete: Cascade)
+  
+  @@map("scored_trends")
+}
+
+model ContentDraft {
+  id              Int      @id @default(autoincrement())
+  trendId         Int      @map("trend_id")
+  platform        String   // "twitter", "linkedin", "instagram"
+  contentType     String   @map("content_type") // "post", "thread", "story"
+  content         String
+  hashtags        String[]
+  status          String   @default("pending") // "pending", "approved", "rejected", "scheduled", "published"
+  scheduledFor    DateTime? @map("scheduled_for")
+  publishedAt     DateTime? @map("published_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  trend           Trend    @relation(fields: [trendId], references: [id], onDelete: Cascade)
+  
+  @@map("content_drafts")
+}
