@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { config } from './config';
-import prisma from './config/database';
+import { createSupabaseClient } from './config/supabase';
 import trendsRouter from './routes/trends';
 import contentRouter from './routes/content';
 import digestRouter from './routes/digest';
@@ -25,7 +25,11 @@ app.use((req, res, next) => {
 // Health check
 app.get('/health', async (req: Request, res: Response) => {
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    const supabase = createSupabaseClient();
+    const { error } = await supabase.from('trends').select('id', { head: true, count: 'exact' });
+    if (error) {
+      throw error;
+    }
     res.json({
       status: 'healthy',
       timestamp: new Date().toISOString(),
@@ -50,6 +54,7 @@ app.use('/api/v1/digest', digestRouter);
 // Stats endpoint
 app.get('/api/v1/stats', async (req: Request, res: Response) => {
   try {
+    const supabase = createSupabaseClient();
     const [
       totalTrends,
       processedTrends,
@@ -59,13 +64,38 @@ app.get('/api/v1/stats', async (req: Request, res: Response) => {
       rejectedContent,
       scheduledContent,
     ] = await Promise.all([
-      prisma.trend.count(),
-      prisma.trend.count({ where: { processed: true } }),
-      prisma.scoredTrend.count({ where: { passedFilter: true } }),
-      prisma.contentDraft.count({ where: { status: 'pending' } }),
-      prisma.contentDraft.count({ where: { status: 'approved' } }),
-      prisma.contentDraft.count({ where: { status: 'rejected' } }),
-      prisma.contentDraft.count({ where: { status: 'scheduled' } }),
+      supabase.from('trends').select('id', { count: 'exact', head: true }).then(r => {
+        if (r.error) throw r.error;
+        return r.count || 0;
+      }),
+      supabase.from('trends').select('id', { count: 'exact', head: true }).eq('processed', true).then(r => {
+        if (r.error) throw r.error;
+        return r.count || 0;
+      }),
+      supabase
+        .from('scored_trends')
+        .select('id', { count: 'exact', head: true })
+        .eq('passed_filter', true)
+        .then(r => {
+          if (r.error) throw r.error;
+          return r.count || 0;
+        }),
+      supabase.from('content_drafts').select('id', { count: 'exact', head: true }).eq('status', 'pending').then(r => {
+        if (r.error) throw r.error;
+        return r.count || 0;
+      }),
+      supabase.from('content_drafts').select('id', { count: 'exact', head: true }).eq('status', 'approved').then(r => {
+        if (r.error) throw r.error;
+        return r.count || 0;
+      }),
+      supabase.from('content_drafts').select('id', { count: 'exact', head: true }).eq('status', 'rejected').then(r => {
+        if (r.error) throw r.error;
+        return r.count || 0;
+      }),
+      supabase.from('content_drafts').select('id', { count: 'exact', head: true }).eq('status', 'scheduled').then(r => {
+        if (r.error) throw r.error;
+        return r.count || 0;
+      }),
     ]);
 
     res.json({
@@ -107,7 +137,11 @@ const PORT = config.port;
 async function startServer() {
   try {
     // Test database connection
-    await prisma.$connect();
+    const supabase = createSupabaseClient();
+    const { error } = await supabase.from('trends').select('id', { head: true, count: 'exact' });
+    if (error) {
+      throw error;
+    }
     console.log('✅ Database connected');
 
     app.listen(PORT, () => {
@@ -127,12 +161,10 @@ startServer();
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully...');
-  await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully...');
-  await prisma.$disconnect();
   process.exit(0);
 });

@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
-import prisma from '../../config/database';
 import { config } from '../../config';
+import { createSupabaseClient } from '../../config/supabase';
 
 interface DigestResult {
   sent: boolean;
@@ -12,8 +12,10 @@ interface DigestResult {
 
 export class EmailDigestService {
   private transporter: nodemailer.Transporter | null = null;
+  private accessToken?: string;
 
-  constructor() {
+  constructor(accessToken?: string) {
+    this.accessToken = accessToken;
     if (config.gmail.user && config.gmail.appPassword) {
       this.transporter = nodemailer.createTransport({
         service: 'gmail',
@@ -37,24 +39,21 @@ export class EmailDigestService {
     }
 
     // Get pending content drafts
-    const contentDrafts = await prisma.contentDraft.findMany({
-      where: {
-        status: 'pending',
-      },
-      include: {
-        trend: {
-          include: {
-            scoredTrend: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 10,
-    });
+    const supabase = createSupabaseClient(this.accessToken);
+    const { data: contentDrafts, error } = await supabase
+      .from('content_drafts')
+      .select(
+        'id, trend_id, platform, content_type, content, hashtags, status, created_at, trends(id, title, url, scored_trends(relevance_score, keyword_matches))'
+      )
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(10);
 
-    if (contentDrafts.length === 0) {
+    if (error) {
+      throw error;
+    }
+
+    if (!contentDrafts || contentDrafts.length === 0) {
       return {
         sent: false,
         reason: 'no_pending_content',
@@ -129,15 +128,15 @@ export class EmailDigestService {
       html += `<h2>📱 ${platform.charAt(0).toUpperCase() + platform.slice(1)} (${drafts.length})</h2>`;
 
       for (const draft of drafts) {
-        const trend = draft.trend;
-        const scored = draft.trend.scoredTrend;
+        const trend = draft.trend || draft.trends;
+        const scored = trend?.scoredTrend || trend?.scored_trends;
 
         html += `
 <div class="content-item">
   <div class="trend-info">
     <strong>Source Trend:</strong> ${trend.title || 'No title'}<br>
-    <strong>Relevance Score:</strong> <span class="score">${scored?.relevanceScore || 'N/A'}</span><br>
-    <strong>Keywords:</strong> ${scored?.keywordMatches?.join(', ') || 'None'}<br>
+    <strong>Relevance Score:</strong> <span class="score">${scored?.relevanceScore ?? scored?.relevance_score ?? 'N/A'}</span><br>
+    <strong>Keywords:</strong> ${(scored?.keywordMatches ?? scored?.keyword_matches)?.join(', ') || 'None'}<br>
     <strong>URL:</strong> <a href="${trend.url}">${trend.url}</a>
   </div>
   <p><strong>Content:</strong></p>

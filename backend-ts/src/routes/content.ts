@@ -1,15 +1,17 @@
 import { Router, Request, Response } from 'express';
-import prisma from '../config/database';
+import { createSupabaseClient } from '../config/supabase';
+import { requireAdmin } from '../middleware/requireAdmin';
 import { ContentGeneratorService } from '../services/generation/contentGenerator';
 
 const router = Router();
 
 // POST /api/v1/content/generate - Generate content for trends
-router.post('/generate', async (req: Request, res: Response) => {
+router.post('/generate', requireAdmin, async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 5;
+    const accessToken = (req as any).accessToken as string;
     
-    const generatorService = new ContentGeneratorService();
+    const generatorService = new ContentGeneratorService(accessToken);
     const generatedCount = await generatorService.generateContentForTopTrends(limit);
     
     res.json({
@@ -26,30 +28,39 @@ router.post('/generate', async (req: Request, res: Response) => {
 });
 
 // POST /api/v1/content/generate/all - Generate content for ALL trends
-router.post('/generate/all', async (req: Request, res: Response) => {
+router.post('/generate/all', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const generatorService = new ContentGeneratorService();
+    const accessToken = (req as any).accessToken as string;
+    const generatorService = new ContentGeneratorService(accessToken);
+    const supabase = createSupabaseClient(accessToken);
     
     // Get total trend count
-    const totalTrends = await prisma.trend.count();
+    const { count: totalTrends, error: countError } = await supabase
+      .from('trends')
+      .select('id', { count: 'exact', head: true });
+
+    if (countError) {
+      throw countError;
+    }
     
     // Generate content for all trends (in batches to avoid timeout)
     const batchSize = 10;
     let totalGenerated = 0;
+    const total = totalTrends || 0;
     
-    for (let offset = 0; offset < totalTrends; offset += batchSize) {
+    for (let offset = 0; offset < total; offset += batchSize) {
       const count = await generatorService.generateContentForTopTrends(batchSize);
       totalGenerated += count;
       
       // Small delay between batches to avoid rate limits
-      if (offset + batchSize < totalTrends) {
+      if (offset + batchSize < total) {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
     
     res.json({
       status: 'success',
-      total_trends: totalTrends,
+      total_trends: totalTrends || 0,
       generated_count: totalGenerated,
     });
   } catch (error) {
@@ -62,14 +73,21 @@ router.post('/generate/all', async (req: Request, res: Response) => {
 });
 
 // POST /api/v1/content/generate/:trendId - Regenerate content for specific trend
-router.post('/generate/:trendId', async (req: Request, res: Response) => {
+router.post('/generate/:trendId', requireAdmin, async (req: Request, res: Response) => {
   try {
     const trendId = parseInt(req.params.trendId);
+    const accessToken = (req as any).accessToken as string;
+    const supabase = createSupabaseClient(accessToken);
     
-    const trend = await prisma.trend.findUnique({
-      where: { id: trendId },
-      include: { scoredTrend: true },
-    });
+    const { data: trend, error: trendError } = await supabase
+      .from('trends')
+      .select('id, source, source_id, title, text, url, author, timestamp, likes, shares, comments, views, scored_trends(relevance_score, keyword_matches, risk_level, passed_filter)')
+      .eq('id', trendId)
+      .maybeSingle();
+
+    if (trendError) {
+      throw trendError;
+    }
     
     if (!trend) {
       return res.status(404).json({
@@ -78,8 +96,8 @@ router.post('/generate/:trendId', async (req: Request, res: Response) => {
       });
     }
     
-    const generatorService = new ContentGeneratorService();
-    const count = await (generatorService as any).generateContentForTrend(trend);
+    const generatorService = new ContentGeneratorService(accessToken);
+    const count = await generatorService.generateContentForTrend(trend);
     
     res.json({
       status: 'success',
@@ -101,20 +119,24 @@ router.get('/', async (req: Request, res: Response) => {
     const status = req.query.status as string | undefined;
     const limit = parseInt(req.query.limit as string) || 20;
 
-    const content = await prisma.contentDraft.findMany({
-      where: status ? { status } : undefined,
-      include: {
-        trend: {
-          include: {
-            scoredTrend: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: limit,
-    });
+    const supabase = createSupabaseClient();
+
+    let query = supabase
+      .from('content_drafts')
+      .select(
+        'id, trend_id, platform, content_type, content, hashtags, status, scheduled_for, published_at, created_at, trends(id, source, title, text, url, author, timestamp, scored_trends(relevance_score, risk_level, keyword_matches, passed_filter))'
+      )
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data: content, error } = await query;
+    if (error) {
+      throw error;
+    }
 
     res.json(content);
   } catch (error) {
@@ -127,14 +149,22 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // PUT /api/v1/content/:id/approve - Approve content draft
-router.put('/:id/approve', async (req: Request, res: Response) => {
+router.put('/:id/approve', requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id);
+    const accessToken = (req as any).accessToken as string;
+    const supabase = createSupabaseClient(accessToken);
     
-    const content = await prisma.contentDraft.update({
-      where: { id },
-      data: { status: 'approved' },
-    });
+    const { data: content, error } = await supabase
+      .from('content_drafts')
+      .update({ status: 'approved' })
+      .eq('id', id)
+      .select('*')
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
     
     res.json({
       status: 'success',
@@ -150,14 +180,22 @@ router.put('/:id/approve', async (req: Request, res: Response) => {
 });
 
 // PUT /api/v1/content/:id/reject - Reject content draft
-router.put('/:id/reject', async (req: Request, res: Response) => {
+router.put('/:id/reject', requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id);
+    const accessToken = (req as any).accessToken as string;
+    const supabase = createSupabaseClient(accessToken);
     
-    const content = await prisma.contentDraft.update({
-      where: { id },
-      data: { status: 'rejected' },
-    });
+    const { data: content, error } = await supabase
+      .from('content_drafts')
+      .update({ status: 'rejected' })
+      .eq('id', id)
+      .select('*')
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
     
     res.json({
       status: 'success',

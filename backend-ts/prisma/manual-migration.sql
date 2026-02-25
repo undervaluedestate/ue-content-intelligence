@@ -48,6 +48,12 @@ CREATE TABLE IF NOT EXISTS content_drafts (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Admins table for RLS-controlled privileged actions
+CREATE TABLE IF NOT EXISTS admins (
+    user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_trends_source_id ON trends(source_id);
 CREATE INDEX IF NOT EXISTS idx_trends_processed ON trends(processed);
@@ -58,11 +64,104 @@ CREATE INDEX IF NOT EXISTS idx_scored_trends_relevance_score ON scored_trends(re
 CREATE INDEX IF NOT EXISTS idx_content_drafts_trend_id ON content_drafts(trend_id);
 CREATE INDEX IF NOT EXISTS idx_content_drafts_status ON content_drafts(status);
 
+-- Enable RLS
+ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trends ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scored_trends ENABLE ROW LEVEL SECURITY;
+ALTER TABLE content_drafts ENABLE ROW LEVEL SECURITY;
+
+-- Admins: allow authenticated users to read their own admin row
+DROP POLICY IF EXISTS admins_select_self ON admins;
+CREATE POLICY admins_select_self
+ON admins
+FOR SELECT
+TO authenticated
+USING (user_id = auth.uid());
+
+-- Trends: public read, admin-only insert/update
+DROP POLICY IF EXISTS trends_read_all ON trends;
+CREATE POLICY trends_read_all
+ON trends
+FOR SELECT
+TO anon, authenticated
+USING (true);
+
+DROP POLICY IF EXISTS trends_admin_insert ON trends;
+CREATE POLICY trends_admin_insert
+ON trends
+FOR INSERT
+TO authenticated
+WITH CHECK (EXISTS (SELECT 1 FROM admins a WHERE a.user_id = auth.uid()));
+
+DROP POLICY IF EXISTS trends_admin_update ON trends;
+CREATE POLICY trends_admin_update
+ON trends
+FOR UPDATE
+TO authenticated
+USING (EXISTS (SELECT 1 FROM admins a WHERE a.user_id = auth.uid()))
+WITH CHECK (EXISTS (SELECT 1 FROM admins a WHERE a.user_id = auth.uid()));
+
+-- Scored trends: public read, admin-only insert/update
+DROP POLICY IF EXISTS scored_trends_read_all ON scored_trends;
+CREATE POLICY scored_trends_read_all
+ON scored_trends
+FOR SELECT
+TO anon, authenticated
+USING (true);
+
+DROP POLICY IF EXISTS scored_trends_admin_insert ON scored_trends;
+CREATE POLICY scored_trends_admin_insert
+ON scored_trends
+FOR INSERT
+TO authenticated
+WITH CHECK (EXISTS (SELECT 1 FROM admins a WHERE a.user_id = auth.uid()));
+
+DROP POLICY IF EXISTS scored_trends_admin_update ON scored_trends;
+CREATE POLICY scored_trends_admin_update
+ON scored_trends
+FOR UPDATE
+TO authenticated
+USING (EXISTS (SELECT 1 FROM admins a WHERE a.user_id = auth.uid()))
+WITH CHECK (EXISTS (SELECT 1 FROM admins a WHERE a.user_id = auth.uid()));
+
+-- Content drafts:
+-- - public read approved
+-- - admins can read all
+-- - admin-only insert/update
+DROP POLICY IF EXISTS content_drafts_read_approved ON content_drafts;
+CREATE POLICY content_drafts_read_approved
+ON content_drafts
+FOR SELECT
+TO anon, authenticated
+USING (status = 'approved');
+
+DROP POLICY IF EXISTS content_drafts_admin_read_all ON content_drafts;
+CREATE POLICY content_drafts_admin_read_all
+ON content_drafts
+FOR SELECT
+TO authenticated
+USING (EXISTS (SELECT 1 FROM admins a WHERE a.user_id = auth.uid()));
+
+DROP POLICY IF EXISTS content_drafts_admin_insert ON content_drafts;
+CREATE POLICY content_drafts_admin_insert
+ON content_drafts
+FOR INSERT
+TO authenticated
+WITH CHECK (EXISTS (SELECT 1 FROM admins a WHERE a.user_id = auth.uid()));
+
+DROP POLICY IF EXISTS content_drafts_admin_update ON content_drafts;
+CREATE POLICY content_drafts_admin_update
+ON content_drafts
+FOR UPDATE
+TO authenticated
+USING (EXISTS (SELECT 1 FROM admins a WHERE a.user_id = auth.uid()))
+WITH CHECK (EXISTS (SELECT 1 FROM admins a WHERE a.user_id = auth.uid()));
+
 -- Verify tables created
 SELECT 
     table_name,
     (SELECT COUNT(*) FROM information_schema.columns WHERE table_name = t.table_name) as column_count
 FROM information_schema.tables t
 WHERE table_schema = 'public' 
-AND table_name IN ('trends', 'scored_trends', 'content_drafts')
+AND table_name IN ('trends', 'scored_trends', 'content_drafts', 'admins')
 ORDER BY table_name;

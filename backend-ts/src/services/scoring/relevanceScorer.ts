@@ -1,16 +1,30 @@
-import prisma from '../../config/database';
 import { config } from '../../config';
+import { createSupabaseClient } from '../../config/supabase';
 
 type RiskLevel = 'safe' | 'sensitive' | 'avoid';
 
 export class RelevanceScoringService {
-  async scoreUnprocessedTrends(): Promise<number> {
-    const trends = await prisma.trend.findMany({
-      where: { processed: false },
-      take: config.maxTrendsPerCycle,
-    });
+  private accessToken?: string;
 
-    if (trends.length === 0) {
+  constructor(accessToken?: string) {
+    this.accessToken = accessToken;
+  }
+
+  async scoreUnprocessedTrends(): Promise<number> {
+    const supabase = createSupabaseClient(this.accessToken);
+
+    const { data: trends, error } = await supabase
+      .from('trends')
+      .select('id, title, text, url, author, timestamp, likes, shares, comments, views')
+      .eq('processed', false)
+      .order('id', { ascending: false })
+      .limit(config.maxTrendsPerCycle);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!trends || trends.length === 0) {
       console.log('ℹ️  No unprocessed trends to score');
       return 0;
     }
@@ -20,10 +34,15 @@ export class RelevanceScoringService {
     for (const trend of trends) {
       try {
         await this.scoreTrend(trend);
-        await prisma.trend.update({
-          where: { id: trend.id },
-          data: { processed: true },
-        });
+
+        const { error: updateError } = await supabase
+          .from('trends')
+          .update({ processed: true })
+          .eq('id', trend.id);
+
+        if (updateError) {
+          throw updateError;
+        }
         scoredCount++;
       } catch (error) {
         console.error(`❌ Error scoring trend ${trend.id}:`, error);
@@ -35,6 +54,7 @@ export class RelevanceScoringService {
   }
 
   private async scoreTrend(trend: any): Promise<void> {
+    const supabase = createSupabaseClient(this.accessToken);
     const fullText = `${trend.title || ''} ${trend.text}`.toLowerCase();
 
     // Calculate relevance score
@@ -53,19 +73,21 @@ export class RelevanceScoringService {
     const passedFilter = relevanceScore >= config.relevanceThreshold && riskLevel !== 'avoid';
 
     // Create scored trend
-    await prisma.scoredTrend.create({
-      data: {
-        trendId: trend.id,
-        relevanceScore,
-        viralityScore,
-        macroImpactScore,
-        riskLevel,
-        keywordMatches,
-        sensitiveFlags,
-        riskReason,
-        passedFilter,
-      },
+    const { error: insertError } = await supabase.from('scored_trends').insert({
+      trend_id: trend.id,
+      relevance_score: relevanceScore,
+      virality_score: viralityScore,
+      macro_impact_score: macroImpactScore,
+      risk_level: riskLevel,
+      keyword_matches: keywordMatches,
+      sensitive_flags: sensitiveFlags,
+      risk_reason: riskReason,
+      passed_filter: passedFilter,
     });
+
+    if (insertError) {
+      throw insertError;
+    }
 
     console.log(
       `✅ Scored trend ${trend.id}: relevance=${relevanceScore.toFixed(1)}, risk=${riskLevel}, passed=${passedFilter}`

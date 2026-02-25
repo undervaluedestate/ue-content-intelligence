@@ -1,12 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { EmailDigestService } from '../services/email/digestService';
+import { requireAdmin } from '../middleware/requireAdmin';
 
 const router = Router();
 
 // POST /api/v1/digest/send - Send email digest with pending content
-router.post('/send', async (req: Request, res: Response) => {
+router.post('/send', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const digestService = new EmailDigestService();
+    const accessToken = (req as any).accessToken as string;
+    const digestService = new EmailDigestService(accessToken);
     const result = await digestService.sendDigest();
     
     if (result.sent) {

@@ -7,11 +7,13 @@ export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   
-  // Database
-  databaseUrl: process.env.DATABASE_URL!,
+  // Supabase
+  supabaseUrl: process.env.SUPABASE_URL!,
+  supabaseAnonKey: process.env.SUPABASE_ANON_KEY!,
   
   // AI Services
   googleApiKey: process.env.GOOGLE_API_KEY,
+  aiModel: process.env.DEFAULT_AI_MODEL || 'gemini-2.0-flash',
   
   // Email
   gmail: {
@@ -34,8 +36,12 @@ export const config = {
 };
 
 // Validate required config
-if (!config.databaseUrl) {
-  throw new Error('DATABASE_URL is required');
+if (!config.supabaseUrl) {
+  throw new Error('SUPABASE_URL is required');
+}
+
+if (!config.supabaseAnonKey) {
+  throw new Error('SUPABASE_ANON_KEY is required');
 }
 
 if (!config.googleApiKey) {

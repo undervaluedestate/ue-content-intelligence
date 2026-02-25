@@ -5,7 +5,11 @@ const prisma = new PrismaClient({
   // Disable prepared statements for PgBouncer compatibility
   datasources: {
     db: {
-      url: process.env.DATABASE_URL + (process.env.DATABASE_URL?.includes('?') ? '&' : '?') + 'pgbouncer=true',
+      url: process.env.DATABASE_URL
+        ? (process.env.DATABASE_URL.includes('pgbouncer=true')
+            ? process.env.DATABASE_URL
+            : process.env.DATABASE_URL + (process.env.DATABASE_URL.includes('?') ? '&' : '?') + 'pgbouncer=true')
+        : process.env.DATABASE_URL,
     },
   },
 });

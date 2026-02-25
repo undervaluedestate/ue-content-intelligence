@@ -1,16 +1,17 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import prisma from '../../config/database';
 import { config } from '../../config';
+import { createSupabaseClient } from '../../config/supabase';
 
 export class ContentGeneratorService {
   private genAI: GoogleGenerativeAI | null = null;
   private model: any = null;
+  private accessToken?: string;
 
-  constructor() {
+  constructor(accessToken?: string) {
+    this.accessToken = accessToken;
     if (config.googleApiKey) {
       this.genAI = new GoogleGenerativeAI(config.googleApiKey);
-      // Use gemini-2.0-flash (fast, latest stable model)
-      this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      this.model = this.genAI.getGenerativeModel({ model: config.aiModel });
     } else {
       console.warn('⚠️  Google API key not configured - content generation disabled');
     }
@@ -22,19 +23,21 @@ export class ContentGeneratorService {
       return 0;
     }
 
+    const supabase = createSupabaseClient(this.accessToken);
+
     // Get ALL trends (no filtering by passedFilter or existing content)
     // This allows generating multiple drafts per trend
-    const trends = await prisma.trend.findMany({
-      include: {
-        scoredTrend: true,
-      },
-      orderBy: {
-        id: 'desc', // Most recent first
-      },
-      take: limit,
-    });
+    const { data: trends, error } = await supabase
+      .from('trends')
+      .select('id, source, source_id, title, text, url, author, timestamp, scored_trends(relevance_score, keyword_matches, risk_level, passed_filter)')
+      .order('id', { ascending: false })
+      .limit(limit);
 
-    if (trends.length === 0) {
+    if (error) {
+      throw error;
+    }
+
+    if (!trends || trends.length === 0) {
       console.log('ℹ️  No trends found to generate content for');
       return 0;
     }
@@ -54,10 +57,12 @@ export class ContentGeneratorService {
     return totalGenerated;
   }
 
-  private async generateContentForTrend(trend: any): Promise<number> {
-    const scoredTrend = trend.scoredTrend;
-    const relevanceScore = scoredTrend?.relevanceScore || 'N/A';
-    const keywords = scoredTrend?.keywordMatches?.join(', ') || 'N/A';
+  async generateContentForTrend(trend: any): Promise<number> {
+    const supabase = createSupabaseClient(this.accessToken);
+
+    const scoredTrend = trend.scoredTrend || trend.scored_trends;
+    const relevanceScore = scoredTrend?.relevanceScore ?? scoredTrend?.relevance_score ?? 'N/A';
+    const keywords = (scoredTrend?.keywordMatches ?? scoredTrend?.keyword_matches)?.join(', ') || 'N/A';
     
     const prompt = `You are a social media content creator for a Nigerian real estate brand called "Undervalued Estate".
 
@@ -116,16 +121,18 @@ Format your response as JSON:
 
       for (const platform of platforms) {
         if (contentData[platform]) {
-          await prisma.contentDraft.create({
-            data: {
-              trendId: trend.id,
-              platform,
-              contentType: 'post',
-              content: contentData[platform].content,
-              hashtags: contentData[platform].hashtags || [],
-              status: 'pending',
-            },
+          const { error: insertError } = await supabase.from('content_drafts').insert({
+            trend_id: trend.id,
+            platform,
+            content_type: 'post',
+            content: contentData[platform].content,
+            hashtags: contentData[platform].hashtags || [],
+            status: 'pending',
           });
+
+          if (insertError) {
+            throw insertError;
+          }
           createdCount++;
         }
       }
