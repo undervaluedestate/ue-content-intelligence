@@ -1,14 +1,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getStats, getContentDrafts, getTrends, ContentDraft, Stats } from '@/lib/api';
+import {
+  getStats,
+  getContentDrafts,
+  ContentDraft,
+  Stats,
+  triggerIngestion,
+  triggerScoring,
+  triggerContentGeneration,
+} from '@/lib/api';
 import { formatRelativeTime, getStatusColor, getPlatformColor } from '@/lib/utils';
 import Link from 'next/link';
+import api from '@/lib/api';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [pendingContent, setPendingContent] = useState<ContentDraft[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminEmail, setAdminEmail] = useState<string | null>(null);
+  const [adminBusy, setAdminBusy] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
@@ -17,6 +29,23 @@ export default function Dashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
+
+      const token = typeof window !== 'undefined' ? window.localStorage.getItem('adminToken') : null;
+      if (token) {
+        try {
+          const { data } = await api.get('/auth/me');
+          setIsAdmin(true);
+          setAdminEmail(data?.user?.email || null);
+        } catch {
+          window.localStorage.removeItem('adminToken');
+          setIsAdmin(false);
+          setAdminEmail(null);
+        }
+      } else {
+        setIsAdmin(false);
+        setAdminEmail(null);
+      }
+
       const [statsData, contentData] = await Promise.all([
         getStats(),
         getContentDrafts({ status: 'pending', limit: 10 }),
@@ -27,6 +56,35 @@ export default function Dashboard() {
       console.error('Error loading dashboard:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('adminToken');
+    }
+    setIsAdmin(false);
+    setAdminEmail(null);
+    loadDashboardData();
+  };
+
+  const handleAdminAction = async (action: 'ingest' | 'score' | 'generate') => {
+    try {
+      setAdminBusy(true);
+      if (action === 'ingest') {
+        await triggerIngestion();
+      } else if (action === 'score') {
+        await triggerScoring();
+      } else {
+        await triggerContentGeneration(1);
+      }
+      await loadDashboardData();
+      alert('Done');
+    } catch (err) {
+      console.error(err);
+      alert('Failed');
+    } finally {
+      setAdminBusy(false);
     }
   };
 
@@ -68,12 +126,55 @@ export default function Dashboard() {
               >
                 Review Content
               </Link>
+              {isAdmin ? (
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800"
+                >
+                  Logout{adminEmail ? ` (${adminEmail})` : ''}
+                </button>
+              ) : (
+                <Link
+                  href="/admin/login"
+                  className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800"
+                >
+                  Admin Login
+                </Link>
+              )}
             </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {isAdmin && (
+          <div className="bg-white rounded-lg shadow mb-6 p-4">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => handleAdminAction('ingest')}
+                disabled={adminBusy}
+                className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Ingest Latest Trends
+              </button>
+              <button
+                onClick={() => handleAdminAction('score')}
+                disabled={adminBusy}
+                className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Score Trends
+              </button>
+              <button
+                onClick={() => handleAdminAction('generate')}
+                disabled={adminBusy}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
+              >
+                Generate Content (1)
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard
@@ -194,18 +295,18 @@ function ContentPreviewCard({ content }: { content: ContentDraft }) {
                 {content.platform.toUpperCase()}
               </span>
               <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700">
-                {content.angle.replace('_', ' ')}
+                {content.content_type}
               </span>
-              {content.trend_info && (
+              {content.trends && (
                 <span className="text-xs text-gray-500">
-                  {formatRelativeTime(content.trend_info.timestamp)}
+                  {formatRelativeTime(content.trends.timestamp)}
                 </span>
               )}
             </div>
 
-            {content.trend_info && (
+            {content.trends && (
               <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                {content.trend_info.title || content.trend_info.text.substring(0, 100)}
+                {content.trends.title || content.trends.text.substring(0, 100)}
               </h3>
             )}
 

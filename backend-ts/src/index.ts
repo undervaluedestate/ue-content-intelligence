@@ -4,6 +4,7 @@ import { createSupabaseClient } from './config/supabase';
 import trendsRouter from './routes/trends';
 import contentRouter from './routes/content';
 import digestRouter from './routes/digest';
+import authRouter from './routes/auth';
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.get('/health', async (req: Request, res: Response) => {
 app.use('/api/v1/trends', trendsRouter);
 app.use('/api/v1/content', contentRouter);
 app.use('/api/v1/digest', digestRouter);
+app.use('/api/v1/auth', authRouter);
 
 // Stats endpoint
 app.get('/api/v1/stats', async (req: Request, res: Response) => {

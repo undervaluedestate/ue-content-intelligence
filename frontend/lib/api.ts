@@ -13,6 +13,17 @@ const api = axios.create({
   },
 });
 
+api.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = window.localStorage.getItem('adminToken');
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
 // Types
 export interface Trend {
   id: number;
@@ -31,15 +42,16 @@ export interface Trend {
 
 export interface ContentDraft {
   id: number;
+  trend_id: number;
   platform: string;
-  angle: string;
+  content_type: string;
   content: string;
-  hook?: string;
-  thread?: string[];
-  carousel_slides?: string[];
+  hashtags: string[];
   status: string;
-  generated_at: string;
-  trend_info?: Trend;
+  scheduled_for?: string;
+  published_at?: string;
+  created_at: string;
+  trends?: Trend;
 }
 
 export interface Stats {
@@ -88,12 +100,22 @@ export const approveContent = async (
   editedContent?: string,
   rejectionReason?: string
 ) => {
-  const response = await api.post('/content/approve', {
-    content_id: contentId,
-    action,
-    approved_by: approvedBy,
+  if (action === 'approve') {
+    const response = await api.put(`/content/${contentId}/approve`);
+    return response.data;
+  }
+
+  if (action === 'reject') {
+    const response = await api.put(`/content/${contentId}/reject`, {
+      rejection_reason: rejectionReason,
+      rejected_by: approvedBy,
+    });
+    return response.data;
+  }
+
+  const response = await api.put(`/content/${contentId}/edit`, {
     edited_content: editedContent,
-    rejection_reason: rejectionReason,
+    edited_by: approvedBy,
   });
   return response.data;
 };

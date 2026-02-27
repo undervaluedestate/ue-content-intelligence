@@ -5,6 +5,14 @@ import { ContentGeneratorService } from '../services/generation/contentGenerator
 
 const router = Router();
 
+function extractBearerToken(req: Request): string | null {
+  const header = req.header('authorization') || req.header('Authorization');
+  if (!header) return null;
+
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1] : null;
+}
+
 // POST /api/v1/content/generate - Generate content for trends
 router.post('/generate', requireAdmin, async (req: Request, res: Response) => {
   try {
@@ -119,7 +127,25 @@ router.get('/', async (req: Request, res: Response) => {
     const status = req.query.status as string | undefined;
     const limit = parseInt(req.query.limit as string) || 20;
 
-    const supabase = createSupabaseClient();
+    const token = extractBearerToken(req);
+    let supabase = createSupabaseClient();
+
+    if (token) {
+      const adminClient = createSupabaseClient(token);
+
+      const { data: userData, error: userError } = await adminClient.auth.getUser();
+      if (!userError && userData?.user) {
+        const { data: adminRow, error: adminError } = await adminClient
+          .from('admins')
+          .select('user_id')
+          .eq('user_id', userData.user.id)
+          .maybeSingle();
+
+        if (!adminError && adminRow) {
+          supabase = adminClient;
+        }
+      }
+    }
 
     let query = supabase
       .from('content_drafts')
@@ -203,6 +229,42 @@ router.put('/:id/reject', requireAdmin, async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error rejecting content:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// PUT /api/v1/content/:id/edit - Edit content draft
+router.put('/:id/edit', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    const accessToken = (req as any).accessToken as string;
+    const supabase = createSupabaseClient(accessToken);
+
+    const editedContent = (req.body?.edited_content as string | undefined) || '';
+    if (!editedContent.trim()) {
+      return res.status(400).json({ status: 'error', message: 'edited_content is required' });
+    }
+
+    const { data: content, error } = await supabase
+      .from('content_drafts')
+      .update({ content: editedContent })
+      .eq('id', id)
+      .select('*')
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({
+      status: 'success',
+      content,
+    });
+  } catch (error) {
+    console.error('Error editing content:', error);
     res.status(500).json({
       status: 'error',
       message: error instanceof Error ? error.message : 'Unknown error',

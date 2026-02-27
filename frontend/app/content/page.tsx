@@ -9,6 +9,7 @@ import {
   copyToClipboard,
 } from '@/lib/utils';
 import Link from 'next/link';
+import api from '@/lib/api';
 
 export default function ContentPage() {
   const [content, setContent] = useState<ContentDraft[]>([]);
@@ -18,9 +19,19 @@ export default function ContentPage() {
   const [editMode, setEditMode] = useState(false);
   const [editedText, setEditedText] = useState('');
   const [userEmail, setUserEmail] = useState('user@example.com');
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    loadContent();
+    (async () => {
+      try {
+        await api.get('/auth/me');
+        setIsAdmin(true);
+        await loadContent();
+      } catch {
+        setIsAdmin(false);
+        window.location.href = '/admin/login';
+      }
+    })();
   }, [filter]);
 
   const loadContent = async () => {
@@ -108,6 +119,18 @@ export default function ContentPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {!isAdmin && (
+          <div className="bg-white rounded-lg shadow mb-6 p-4">
+            <p className="text-sm text-gray-700">
+              You must be logged in as an admin to review content. Redirecting to{' '}
+              <Link href="/admin/login" className="text-primary-600 hover:text-primary-700">
+                Admin Login
+              </Link>
+              .
+            </p>
+          </div>
+        )}
+
         {/* Filters */}
         <div className="bg-white rounded-lg shadow mb-6 p-4">
           <div className="flex gap-2">
@@ -199,7 +222,7 @@ function ContentCard({
               {content.platform.toUpperCase()}
             </span>
             <span className="px-2 py-1 rounded text-xs font-medium bg-gray-200 text-gray-700">
-              {content.angle.replace('_', ' ')}
+              {content.content_type}
             </span>
           </div>
           <span
@@ -210,9 +233,9 @@ function ContentCard({
             {content.status}
           </span>
         </div>
-        {content.trend_info && (
+        {content.trends && (
           <p className="text-sm text-gray-600 font-medium">
-            {content.trend_info.title || content.trend_info.text.substring(0, 80) + '...'}
+            {content.trends.title || content.trends.text.substring(0, 80) + '...'}
           </p>
         )}
       </div>
@@ -225,15 +248,9 @@ function ContentCard({
           </p>
         </div>
 
-        {content.thread && content.thread.length > 0 && (
+        {content.hashtags && content.hashtags.length > 0 && (
           <div className="mt-3 text-xs text-gray-500">
-            + {content.thread.length} tweet thread
-          </div>
-        )}
-
-        {content.carousel_slides && content.carousel_slides.length > 0 && (
-          <div className="mt-3 text-xs text-gray-500">
-            + {content.carousel_slides.length} carousel slides
+            {content.hashtags.map((h) => `#${h}`).join(' ')}
           </div>
         )}
       </div>
@@ -324,7 +341,7 @@ function ContentDetailModal({
               {content.platform.toUpperCase()}
             </span>
             <span className="px-3 py-1 rounded text-sm font-medium bg-gray-200 text-gray-700">
-              {content.angle.replace('_', ' ')}
+              {content.content_type}
             </span>
             <span
               className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(
@@ -336,17 +353,17 @@ function ContentDetailModal({
           </div>
 
           {/* Trend Info */}
-          {content.trend_info && (
+          {content.trends && (
             <div className="mb-6 p-4 bg-gray-50 rounded-lg">
               <h3 className="font-semibold text-gray-900 mb-2">Source Trend</h3>
               <p className="text-sm text-gray-700 mb-2">
-                {content.trend_info.title || content.trend_info.text}
+                {content.trends.title || content.trends.text}
               </p>
               <div className="flex gap-4 text-xs text-gray-500">
-                <span>Source: {content.trend_info.source}</span>
-                <span>{formatRelativeTime(content.trend_info.timestamp)}</span>
-                {content.trend_info.relevance_score && (
-                  <span>Relevance: {content.trend_info.relevance_score.toFixed(0)}/100</span>
+                <span>Source: {content.trends.source}</span>
+                <span>{formatRelativeTime(content.trends.timestamp)}</span>
+                {content.trends.relevance_score && (
+                  <span>Relevance: {content.trends.relevance_score.toFixed(0)}/100</span>
                 )}
               </div>
             </div>
@@ -382,30 +399,11 @@ function ContentDetailModal({
             )}
           </div>
 
-          {/* Thread */}
-          {content.thread && content.thread.length > 0 && (
+          {content.hashtags && content.hashtags.length > 0 && (
             <div className="mb-6">
-              <h3 className="font-semibold text-gray-900 mb-2">Thread</h3>
-              <div className="space-y-2">
-                {content.thread.map((tweet, idx) => (
-                  <div key={idx} className="p-3 bg-blue-50 rounded-lg text-sm">
-                    {idx + 1}. {tweet}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Carousel */}
-          {content.carousel_slides && content.carousel_slides.length > 0 && (
-            <div className="mb-6">
-              <h3 className="font-semibold text-gray-900 mb-2">Carousel Slides</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {content.carousel_slides.map((slide, idx) => (
-                  <div key={idx} className="p-3 bg-pink-50 rounded-lg text-sm">
-                    <span className="font-bold">Slide {idx + 1}:</span> {slide}
-                  </div>
-                ))}
+              <h3 className="font-semibold text-gray-900 mb-2">Hashtags</h3>
+              <div className="p-4 bg-gray-50 rounded-lg text-gray-700">
+                {content.hashtags.map((h) => `#${h}`).join(' ')}
               </div>
             </div>
           )}

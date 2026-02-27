@@ -15,7 +15,7 @@ export class ContentGeneratorService {
     }
   }
 
-  async generateContentForTopTrends(limit: number = 5): Promise<number> {
+  async generateContentForTopTrends(limit: number = 5, includeBlog: boolean = false): Promise<number> {
     if (!this.openaiApiKey) {
       console.error('❌ AI model not initialized. Check API key configuration.');
       return 0;
@@ -44,7 +44,7 @@ export class ContentGeneratorService {
 
     for (const trend of trends) {
       try {
-        const count = await this.generateContentForTrend(trend);
+        const count = await this.generateContentForTrend(trend, includeBlog);
         totalGenerated += count;
       } catch (error) {
         console.error(`❌ Error generating content for trend ${trend.id}:`, error);
@@ -55,14 +55,14 @@ export class ContentGeneratorService {
     return totalGenerated;
   }
 
-  async generateContentForTrend(trend: any): Promise<number> {
+  async generateContentForTrend(trend: any, includeBlog: boolean = false): Promise<number> {
     const supabase = createSupabaseClient(this.accessToken);
 
     const scoredTrend = trend.scoredTrend || trend.scored_trends;
     const relevanceScore = scoredTrend?.relevanceScore ?? scoredTrend?.relevance_score ?? 'N/A';
     const keywords = (scoredTrend?.keywordMatches ?? scoredTrend?.keyword_matches)?.join(', ') || 'N/A';
     
-    const prompt = `You are a social media content creator for a Nigerian real estate brand called "Undervalued Estate".
+    const prompt = `You are a content marketer for a Nigerian real estate brand called "Undervalued Estate".
 
 Based on this trending news article, create engaging social media content:
 
@@ -72,10 +72,12 @@ URL: ${trend.url}
 Relevance Score: ${relevanceScore}
 Keywords: ${keywords}
 
-Create 3 social media posts:
-1. A Twitter/X post (280 characters max)
-2. A LinkedIn post (professional, 500 characters)
-3. An Instagram caption (engaging, with emojis, 300 characters)
+Create the following content assets:
+1. A Twitter/X post (strictly 280 characters max)
+2. A Twitter/X Premium post (up to 2000 characters)
+3. A LinkedIn post (professional, up to 3000 characters)
+4. An Instagram caption (engaging, up to 2200 characters)
+${includeBlog ? '5. An SEO-optimized pillar blog article (2,500–4,000 words) in Markdown' : ''}
 
 For each post:
 - Make it relevant to Nigerian real estate investors and homebuyers
@@ -84,9 +86,21 @@ For each post:
 - Keep the tone professional but engaging
 - Reference the news without copying it verbatim
 
+Additional requirements:
+- Twitter/X (280): punchy, crisp, avoid fluff.
+- Twitter/X Premium (up to 2000): add context, 3 bullet takeaways, and a stronger CTA.
+- LinkedIn (up to 3000): structure with a strong hook, 3-6 short paragraphs, and bullet insights.
+- Instagram (up to 2200): include a short hook, line breaks, and emojis (not too many).
+${includeBlog ? '- Blog: include H1 title, table of contents, H2/H3 headings, internal linking suggestions (as plain text), and a short FAQ section (3-6 Q&As). Also include a meta description (<= 160 chars) and suggested SEO keywords (5-12).
+' : ''}
+
 Format your response as JSON:
 {
   "twitter": {
+    "content": "...",
+    "hashtags": ["...", "..."]
+  },
+  "twitter_premium": {
     "content": "...",
     "hashtags": ["...", "..."]
   },
@@ -97,7 +111,7 @@ Format your response as JSON:
   "instagram": {
     "content": "...",
     "hashtags": ["...", "..."]
-  }
+  }${includeBlog ? ',\n  "blog": {\n    "title": "...",\n    "meta_description": "...",\n    "keywords": ["..."],\n    "content_markdown": "..."\n  }' : ''}
 }`;
 
     try {
@@ -134,7 +148,7 @@ Format your response as JSON:
       const contentData = JSON.parse(text);
 
       // Create content drafts
-      const platforms = ['twitter', 'linkedin', 'instagram'];
+      const platforms = ['twitter', 'twitter_premium', 'linkedin', 'instagram'];
       let createdCount = 0;
 
       for (const platform of platforms) {
@@ -153,6 +167,29 @@ Format your response as JSON:
           }
           createdCount++;
         }
+      }
+
+      if (includeBlog && contentData.blog?.content_markdown) {
+        const blogTitle = typeof contentData.blog.title === 'string' ? contentData.blog.title : '';
+        const blogMeta = typeof contentData.blog.meta_description === 'string' ? contentData.blog.meta_description : '';
+        const blogKeywords = Array.isArray(contentData.blog.keywords) ? contentData.blog.keywords : [];
+
+        const fullBlogMarkdown = `# ${blogTitle}\n\n${blogMeta ? `*Meta description:* ${blogMeta}\n\n` : ''}${contentData.blog.content_markdown}`;
+
+        const { error: insertBlogError } = await supabase.from('content_drafts').insert({
+          trend_id: trend.id,
+          platform: 'blog',
+          content_type: 'article',
+          content: fullBlogMarkdown,
+          hashtags: blogKeywords,
+          status: 'pending',
+        });
+
+        if (insertBlogError) {
+          throw insertBlogError;
+        }
+
+        createdCount++;
       }
 
       console.log(`✅ Generated ${createdCount} content pieces for trend ${trend.id}`);
