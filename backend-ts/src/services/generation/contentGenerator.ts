@@ -1,24 +1,22 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import axios from 'axios';
 import { config } from '../../config';
 import { createSupabaseClient } from '../../config/supabase';
 
 export class ContentGeneratorService {
-  private genAI: GoogleGenerativeAI | null = null;
-  private model: any = null;
+  private openaiApiKey: string | null = null;
   private accessToken?: string;
 
   constructor(accessToken?: string) {
     this.accessToken = accessToken;
-    if (config.googleApiKey) {
-      this.genAI = new GoogleGenerativeAI(config.googleApiKey);
-      this.model = this.genAI.getGenerativeModel({ model: config.aiModel });
+    if (config.openaiApiKey) {
+      this.openaiApiKey = config.openaiApiKey;
     } else {
-      console.warn('⚠️  Google API key not configured - content generation disabled');
+      console.warn('⚠️  OpenAI API key not configured - content generation disabled');
     }
   }
 
   async generateContentForTopTrends(limit: number = 5): Promise<number> {
-    if (!this.model) {
+    if (!this.openaiApiKey) {
       console.error('❌ AI model not initialized. Check API key configuration.');
       return 0;
     }
@@ -103,17 +101,37 @@ Format your response as JSON:
 }`;
 
     try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      const { data } = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: config.openaiModel,
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are a helpful assistant that returns strictly valid JSON with no surrounding commentary.',
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.7,
+          response_format: { type: 'json_object' },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${this.openaiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 60000,
+        }
+      );
 
-      // Parse JSON response
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('Failed to parse AI response as JSON');
+      const text = data?.choices?.[0]?.message?.content;
+      if (!text || typeof text !== 'string') {
+        throw new Error('OpenAI returned empty response');
       }
 
-      const contentData = JSON.parse(jsonMatch[0]);
+      // Parse JSON response
+      const contentData = JSON.parse(text);
 
       // Create content drafts
       const platforms = ['twitter', 'linkedin', 'instagram'];

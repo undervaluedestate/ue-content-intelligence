@@ -7,16 +7,15 @@ Modern TypeScript/Node.js backend for the Content Intelligence System.
 - **Runtime:** Node.js 18+
 - **Language:** TypeScript
 - **Framework:** Express.js
-- **Database:** PostgreSQL (Supabase)
-- **ORM:** Prisma
-- **AI:** Google Gemini API
+- **Database:** Supabase
+- **AI:** OpenAI API
 - **Email:** Gmail SMTP (Nodemailer)
 
 ## 📋 Prerequisites
 
 - Node.js 18+ and npm
 - Supabase account (free tier)
-- Google Gemini API key (free)
+- OpenAI API key
 - Gmail account with App Password
 
 ## 🛠️ Setup
@@ -36,28 +35,18 @@ cp .env.example .env
 ```
 
 Update the following in `.env`:
-- `DATABASE_URL` - Your Supabase pooled connection string
-- `GOOGLE_API_KEY` - Your Google Gemini API key
+- `SUPABASE_URL` - Your Supabase project URL
+- `SUPABASE_ANON_KEY` - Your Supabase anon key
+- `OPENAI_API_KEY` - Your OpenAI API key
+- `OPENAI_MODEL` - OpenAI model (default: `gpt-4o-mini`)
 - `GMAIL_USER` - Your Gmail address
 - `GMAIL_APP_PASSWORD` - Your Gmail App Password
 
 ### 3. Setup Database
 
-**Option A: Using Prisma (recommended)**
-```bash
-npm run prisma:push
-```
-
-**Option B: Manual SQL (if Prisma push hangs)**
 1. Go to Supabase Dashboard → SQL Editor
-2. Copy contents of `prisma/manual-migration.sql`
+2. Copy contents of `schema.sql`
 3. Run the SQL script
-
-### 4. Generate Prisma Client
-
-```bash
-npm run prisma:generate
-```
 
 ## 🏃 Running
 
@@ -168,47 +157,12 @@ git push
 2. New → Web Service
 3. Connect your GitHub repo
 4. Select `backend-ts` as root directory
-5. Build Command: `npm install && npm run build && npm run prisma:generate`
+5. Build Command: `npm install && npm run build`
 6. Start Command: `npm start`
-7. Add environment variables from `.env`
+7. Add environment variables from `.env` (including `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `OPENAI_API_KEY`)
 8. Deploy!
 
-## 📊 Database Management
-
-### View Database in Prisma Studio
-```bash
-npm run prisma:studio
-```
-
-### Create Migration
-```bash
-npm run prisma:migrate
-```
-
-### Reset Database (⚠️ Destructive)
-```bash
-npx prisma db push --force-reset
-```
-
 ## 🔧 Troubleshooting
-
-### Database Connection Issues
-
-**Error: "password authentication failed"**
-- Ensure you're using the pooled connection string from Supabase
-- Username format: `postgres.<project-ref>`
-- Port: `6543` (not `5432`)
-
-**Error: "Tenant or user not found"**
-- Copy the exact connection string from Supabase Dashboard
-- Settings → Database → Connection string → Session mode
-
-### Prisma Push Hangs
-
-If `prisma db push` hangs:
-1. Cancel it (Ctrl+C)
-2. Run the manual SQL script in Supabase SQL Editor
-3. Then run `npm run prisma:generate`
 
 ### Gmail Issues
 
@@ -233,9 +187,9 @@ backend-ts/
 ├── prisma/
 │   ├── schema.prisma    # Database schema
 │   └── manual-migration.sql  # Manual SQL migration
+├── schema.sql           # Supabase schema + RLS policies
 ├── .env                 # Environment variables (gitignored)
 ├── .env.example         # Example environment variables
-├── tsconfig.json        # TypeScript configuration
 └── package.json         # Dependencies and scripts
 ```
 
@@ -243,10 +197,9 @@ backend-ts/
 
 - ✅ **Real-time News Ingestion** - Fetches Nigerian real estate and business news
 - ✅ **AI-Powered Scoring** - Filters relevant trends using keyword matching
-- ✅ **Content Generation** - Creates social media posts using Google Gemini
+- ✅ **Content Generation** - Creates social media posts using OpenAI
 - ✅ **Email Digests** - Sends daily content summaries via Gmail
 - ✅ **TypeScript** - Full type safety and IDE support
-- ✅ **Prisma ORM** - Type-safe database queries
 - ✅ **Hot Reload** - Fast development with tsx watch mode
 
 ## 📚 Next Steps

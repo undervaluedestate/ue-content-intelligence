@@ -147,7 +147,7 @@ async function startServer() {
     app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
       console.log(`📊 Environment: ${config.nodeEnv}`);
-      console.log(`🔑 Google API Key: ${config.googleApiKey ? '✅ Set' : '❌ Not set'}`);
+      console.log(`🔑 OpenAI API Key: ${config.openaiApiKey ? '✅ Set' : '❌ Not set'}`);
       console.log(`📧 Gmail: ${config.gmail.user ? '✅ Configured' : '❌ Not configured'}`);
     });
   } catch (error) {

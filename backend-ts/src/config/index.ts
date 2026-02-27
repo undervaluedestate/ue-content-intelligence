@@ -12,8 +12,8 @@ export const config = {
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY!,
   
   // AI Services
-  googleApiKey: process.env.GOOGLE_API_KEY,
-  aiModel: process.env.DEFAULT_AI_MODEL || 'gemini-2.0-flash',
+  openaiApiKey: process.env.OPENAI_API_KEY,
+  openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
   
   // Email
   gmail: {
@@ -44,8 +44,8 @@ if (!config.supabaseAnonKey) {
   throw new Error('SUPABASE_ANON_KEY is required');
 }
 
-if (!config.googleApiKey) {
-  console.warn('⚠️  GOOGLE_API_KEY not set - content generation will be disabled');
+if (!config.openaiApiKey) {
+  console.warn('⚠️  OPENAI_API_KEY not set - content generation will be disabled');
 }
 
 if (!config.gmail.user || !config.gmail.appPassword) {
