@@ -61,58 +61,78 @@ export class ContentGeneratorService {
     const scoredTrend = trend.scoredTrend || trend.scored_trends;
     const relevanceScore = scoredTrend?.relevanceScore ?? scoredTrend?.relevance_score ?? 'N/A';
     const keywords = (scoredTrend?.keywordMatches ?? scoredTrend?.keyword_matches)?.join(', ') || 'N/A';
-    
-    const prompt = `You are a content marketer for a Nigerian real estate brand called "Undervalued Estate".
 
-Based on this trending news article, create engaging social media content:
+    const jsonFormatLines = [
+      '{',
+      '  "twitter": {',
+      '    "content": "...",',
+      '    "hashtags": ["...", "..."]',
+      '  },',
+      '  "twitter_premium": {',
+      '    "content": "...",',
+      '    "hashtags": ["...", "..."]',
+      '  },',
+      '  "linkedin": {',
+      '    "content": "...",',
+      '    "hashtags": ["...", "..."]',
+      '  },',
+      '  "instagram": {',
+      '    "content": "...",',
+      '    "hashtags": ["...", "..."]',
+      includeBlog
+        ? '  },\n  "blog": {\n    "title": "...",\n    "meta_description": "...",\n    "keywords": ["..."],\n    "content_markdown": "..."\n  }'
+        : '  }',
+      '}',
+    ];
 
-Title: ${trend.title}
-Content: ${trend.text}
-URL: ${trend.url}
-Relevance Score: ${relevanceScore}
-Keywords: ${keywords}
+    const promptParts: string[] = [
+      'You are a content marketer for a Nigerian real estate brand called "Undervalued Estate".',
+      '',
+      'Based on this trending news article, create engaging social media content:',
+      '',
+      `Title: ${trend.title}`,
+      `Content: ${trend.text}`,
+      `URL: ${trend.url}`,
+      `Relevance Score: ${relevanceScore}`,
+      `Keywords: ${keywords}`,
+      '',
+      'Create the following content assets:',
+      '1. A Twitter/X post (strictly 280 characters max)',
+      '2. A Twitter/X Premium post (up to 2000 characters)',
+      '3. A LinkedIn post (professional, up to 3000 characters)',
+      '4. An Instagram caption (engaging, up to 2200 characters)',
+    ];
 
-Create the following content assets:
-1. A Twitter/X post (strictly 280 characters max)
-2. A Twitter/X Premium post (up to 2000 characters)
-3. A LinkedIn post (professional, up to 3000 characters)
-4. An Instagram caption (engaging, up to 2200 characters)
-${includeBlog ? '5. An SEO-optimized pillar blog article (2,500–4,000 words) in Markdown' : ''}
+    if (includeBlog) {
+      promptParts.push('5. An SEO-optimized pillar blog article (2,500–4,000 words) in Markdown');
+    }
 
-For each post:
-- Make it relevant to Nigerian real estate investors and homebuyers
-- Include a call-to-action
-- Suggest 3-5 relevant hashtags
-- Keep the tone professional but engaging
-- Reference the news without copying it verbatim
+    promptParts.push(
+      '',
+      'For each post:',
+      '- Make it relevant to Nigerian real estate investors and homebuyers',
+      '- Include a call-to-action',
+      '- Suggest 3-5 relevant hashtags',
+      '- Keep the tone professional but engaging',
+      '- Reference the news without copying it verbatim',
+      '',
+      'Additional requirements:',
+      '- Twitter/X (280): punchy, crisp, avoid fluff.',
+      '- Twitter/X Premium (up to 2000): add context, 3 bullet takeaways, and a stronger CTA.',
+      '- LinkedIn (up to 3000): structure with a strong hook, 3-6 short paragraphs, and bullet insights.',
+      '- Instagram (up to 2200): include a short hook, line breaks, and emojis (not too many).'
+    );
 
-Additional requirements:
-- Twitter/X (280): punchy, crisp, avoid fluff.
-- Twitter/X Premium (up to 2000): add context, 3 bullet takeaways, and a stronger CTA.
-- LinkedIn (up to 3000): structure with a strong hook, 3-6 short paragraphs, and bullet insights.
-- Instagram (up to 2200): include a short hook, line breaks, and emojis (not too many).
-${includeBlog ? '- Blog: include H1 title, table of contents, H2/H3 headings, internal linking suggestions (as plain text), and a short FAQ section (3-6 Q&As). Also include a meta description (<= 160 chars) and suggested SEO keywords (5-12).
-' : ''}
+    if (includeBlog) {
+      promptParts.push(
+        '- Blog: include H1 title, table of contents, H2/H3 headings, internal linking suggestions (as plain text), and a short FAQ section (3-6 Q&As).',
+        '- Blog: also include a meta description (<= 160 chars) and suggested SEO keywords (5-12).'
+      );
+    }
 
-Format your response as JSON:
-{
-  "twitter": {
-    "content": "...",
-    "hashtags": ["...", "..."]
-  },
-  "twitter_premium": {
-    "content": "...",
-    "hashtags": ["...", "..."]
-  },
-  "linkedin": {
-    "content": "...",
-    "hashtags": ["...", "..."]
-  },
-  "instagram": {
-    "content": "...",
-    "hashtags": ["...", "..."]
-  }${includeBlog ? ',\n  "blog": {\n    "title": "...",\n    "meta_description": "...",\n    "keywords": ["..."],\n    "content_markdown": "..."\n  }' : ''}
-}`;
+    promptParts.push('', 'Format your response as JSON:', jsonFormatLines.join('\n'));
+
+    const prompt = promptParts.join('\n');
 
     try {
       const { data } = await axios.post(
