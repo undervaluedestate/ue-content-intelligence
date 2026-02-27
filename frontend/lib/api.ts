@@ -155,6 +155,11 @@ export const triggerContentGeneration = async (limit: number = 5) => {
   return response.data;
 };
 
+export const generateContentForTrend = async (trendId: number, params?: { include_blog?: boolean }) => {
+  const response = await api.post(`/content/generate/${trendId}`, null, { params });
+  return response.data;
+};
+
 export const getConfig = async () => {
   const response = await api.get('/config');
   return response.data;
